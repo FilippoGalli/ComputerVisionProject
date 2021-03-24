@@ -34,7 +34,7 @@ def compute_SP(mesh, sigma):
     points = np.asarray(mesh.vertices)
     mesh.compute_vertex_normals()
     normals = np.asarray(mesh.vertex_normals)
-    threshold = 0.75
+    threshold = 0.70
    
     saliency_list = []
     tree = KDTree(points)
@@ -72,11 +72,12 @@ def main():
     pcd_keypoints.points = o3d.utility.Vector3dVector(keypoints)
     
     toc = 1000 * (time.time() - tic)
-    print("SP Computation took {:.0f} [ms]".format(toc))
+    print("SP Computation took {:.0f} [s]".format(toc/1000))
 
     mesh.compute_vertex_normals()
     mesh.paint_uniform_color([0.5, 0.5, 0.5])
-    #keypoints.paint_uniform_color([1.0, 0.75, 0.0])
+    pcd_keypoints.paint_uniform_color([1.0, 0.75, 0.0])
+    
     o3d.visualization.draw_geometries([pcd_keypoints, mesh])
 
     
