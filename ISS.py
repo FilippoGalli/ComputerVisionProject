@@ -30,7 +30,7 @@ def IsLocalMaxima(query_index, indices, saliency):
 def computeISS(pointCloud, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_32=0.975 , min_neighbors=5):
 
     points = np.asarray(pointCloud.points)
-    saliency = np.full(len(points), -1)
+    saliency = np.full(len(points), -1.0)
     keypoints_index = []
     saliency_keypoint = []
     
@@ -57,7 +57,7 @@ def computeISS(pointCloud, salient_radius=0, non_max_radius=0, gamma_21=0.975 , 
         for vector in support:
             vector = np.array(vector) - support_mean
             cov = cov + vector * np.atleast_2d(vector).transpose()
-           
+        cov = cov / len(support)  
         if  np.array_equal(cov, np.zeros([3, 3])):
             continue
         
@@ -70,13 +70,14 @@ def computeISS(pointCloud, salient_radius=0, non_max_radius=0, gamma_21=0.975 , 
         e1c = eigVal[0]
         e2c = eigVal[1]
         e3c = eigVal[2]
-       
+        
 
         if e2c / e1c < gamma_21 and e3c / e2c < gamma_32:
             saliency[i] = e3c
     
     for i in range(len(points)):
         if saliency[i] > 0.0:
+            
             kp_indices = kdtree.query_radius([points[i]], non_max_radius)
             if len(kp_indices[0]) - 1  > min_neighbors and IsLocalMaxima(i, kp_indices[0], saliency):
                 keypoints_index.append(i)
@@ -94,8 +95,8 @@ def main():
 
     tic = time.time()
 
-    keypoints, saliency = computeISS(pcd, 2.4, 1.6)
-  
+    keypoints, saliency = computeISS(pcd, 2.43, 1.62)
+    print(len(keypoints))
     toc = 1000 * (time.time() - tic)
     print("SP Computation took {:.0f} [s]".format(toc/1000))
 

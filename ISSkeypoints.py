@@ -20,7 +20,6 @@ def main():
     mesh = o3d.io.read_triangle_mesh(input_file)
 
     keypoints = compute_ISS(mesh)
-
     mesh.compute_vertex_normals()
     mesh.paint_uniform_color([0.5, 0.5, 0.5])
     keypoints.paint_uniform_color([1.0, 0.75, 0.0])
