@@ -74,7 +74,7 @@ def compute_SP(mesh, sigma):
     
     toc = 1000 * (time.time() - tic)
     print("SP Computation took {:.0f} [s]".format(toc/1000))
-    print(f'number on keypoints {len(points[keypoints_index])}')
+    print(f'number on keypoints found: {len(points[keypoints_index])}')
 
     return [points[keypoints_index], saliency_keypoint]
 
