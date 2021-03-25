@@ -5,9 +5,16 @@ import math
 import time
 
 
+def IsLocalMaxima(query_index, indices, saliency):
+    for i in indices:
+        if saliency[query_index] < saliency[i]:
+            return False
+        
+    return True
+
 def gaussian_filter(tree, sigma, points, index):
 
-    indices = tree.query_radius(points[index:index+1], r=2*sigma)
+    indices = tree.query_radius([points[index]], r=2*sigma)
 
     numerator = 0
     denominator = 0
@@ -31,48 +38,60 @@ def DoG(tree, sigma, points, index):
 
 def compute_SP(mesh, sigma):
 
+    tic = time.time()
+
+
     points = np.asarray(mesh.vertices)
     mesh.compute_vertex_normals()
     normals = np.asarray(mesh.vertex_normals)
     threshold = 0.70
+    min_neighbors = 5
+
+    saliency = np.full(len(points), -1.0)
+    keypoints_index = []
+    saliency_keypoint = []
    
-    saliency_list = []
-    tree = KDTree(points)
+    
+    kdtree = KDTree(points)
 
     for i in range(len(points)):
-        DoG_value = DoG(tree, sigma, points, i)
-        saliency_list.append(np.linalg.norm(np.dot(DoG_value, normals[i])))
+        DoG_value = DoG(kdtree, sigma, points, i)
+        saliency[i] = np.linalg.norm(np.dot(DoG_value, normals[i]))
+        
+    max_saliency = np.amax(saliency)
+    min_saliency = np.amin(saliency)
+    mean = np.mean(saliency)
+
+
+    for i in range(len(points)):
+        saliency[i] = (saliency[i] - min_saliency) / (max_saliency - min_saliency)
+        if saliency[i] >= 0.7:
+            
+            kp_indices = kdtree.query_radius([points[i]], 5)
+            if len(kp_indices[0]) - 1  > min_neighbors and IsLocalMaxima(i, kp_indices[0], saliency):
+                keypoints_index.append(i)
+                saliency_keypoint.append(saliency[i])
     
-    min_saliency = np.amin(saliency_list)
-    max_saliency = np.amax(saliency_list)
+    toc = 1000 * (time.time() - tic)
+    print("SP Computation took {:.0f} [s]".format(toc/1000))
+    print(f'number on keypoints {len(points[keypoints_index])}')
 
-    keypoints = []
-    for i in range(len(saliency_list)):
-        saliency_list[i] = (saliency_list[i] - min_saliency) / (max_saliency - min_saliency)
-
-        if saliency_list[i] >= threshold:
-            keypoints.append(points[i])
-
-    return keypoints
-
+    return [points[keypoints_index], saliency_keypoint]
 
 
 def main():
     sigma = 0.5
 
     # Read .ply file
-    input_file = "Armadillo.ply"
+    input_file = "./data/Armadillo.ply"
     mesh = o3d.io.read_triangle_mesh(input_file)
 
-    tic = time.time()
+    keypoints, saliency = compute_SP(mesh, sigma)
+    np.save('SPkeypoints', keypoints)
+    np.save('SPsaliency', saliency)
 
-    keypoints = compute_SP(mesh, sigma)
-    print(f'number on keypoints {len(keypoints)}')
     pcd_keypoints = o3d.geometry.PointCloud()
     pcd_keypoints.points = o3d.utility.Vector3dVector(keypoints)
-    
-    toc = 1000 * (time.time() - tic)
-    print("SP Computation took {:.0f} [s]".format(toc/1000))
 
     mesh.compute_vertex_normals()
     mesh.paint_uniform_color([0.5, 0.5, 0.5])
