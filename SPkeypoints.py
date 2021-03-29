@@ -82,14 +82,23 @@ def compute_SP(mesh, sigma):
 def main():
     sigma = 0.5
 
+    flag = False
+
     # Read .ply file
     input_file = "./data/Armadillo.ply"
     mesh = o3d.io.read_triangle_mesh(input_file)
 
-    keypoints, saliency = compute_SP(mesh, sigma)
-    np.save('SPkeypoints', keypoints)
-    np.save('SPsaliency', saliency)
-
+    
+    if flag:
+        keypoints, saliency = compute_SP(mesh, sigma)
+        np.save('./data/SPkeypoints', keypoints)
+        np.save('./data/SPsaliency', saliency)
+    else:
+        path_keypoints = './data/SPkeypoints.npy'
+        path_saliency = './data/SPsaliency.npy'
+        keypoints = np.load(path_keypoints)
+        saliency = np.load(path_saliency)
+    
     pcd_keypoints = o3d.geometry.PointCloud()
     pcd_keypoints.points = o3d.utility.Vector3dVector(keypoints)
 
@@ -99,7 +108,7 @@ def main():
     
     o3d.visualization.draw_geometries([pcd_keypoints, mesh])
 
-    
+
 if __name__ == '__main__':
     main()
 

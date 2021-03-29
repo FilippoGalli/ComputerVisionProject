@@ -4,12 +4,7 @@ import numpy as np
 import time
 
 
-       
-        
-
-   
-    
-def computeISS(pointCloud, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_32=0.975 , min_neighbors=5):
+def computeISS(mesh, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_32=0.975 , min_neighbors=5):
 
     def ComputeModelResolution(points, kdtree):
 
@@ -28,8 +23,10 @@ def computeISS(pointCloud, salient_radius=0, non_max_radius=0, gamma_21=0.975 , 
                 return False
         
         return True
-
-    points = np.asarray(pointCloud.points)
+    
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = mesh.vertices
+    points = np.asarray(pcd.points)
     saliency = np.full(len(points), -1.0)
     keypoints_index = []
     saliency_keypoint = []
@@ -97,14 +94,19 @@ def main():
 
     input_file = "./data/Armadillo.ply"
     mesh = o3d.io.read_triangle_mesh(input_file)
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = mesh.vertices
-
-
-    keypoints, saliency = computeISS(pcd, 2.43, 1.62)
-    np.save('ISSkeypoints', keypoints)
-    np.save('ISSsaliency', saliency)
     
+    flag = False
+
+    if flag:
+
+        keypoints, saliency = computeISS(mesh, 2.43, 1.62)
+        np.save('ISSkeypoints', keypoints)
+        np.save('ISSsaliency', saliency)
+    else:
+        path_keypoints = './data/ISSkeypoints.npy'
+        path_saliency = './data/ISSsaliency.npy'
+        keypoints = np.load(path_keypoints)
+        saliency = np.load(path_saliency)
     
     pcd_keypoints = o3d.geometry.PointCloud()
     pcd_keypoints.points = o3d.utility.Vector3dVector(keypoints)

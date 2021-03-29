@@ -51,7 +51,7 @@ def main():
     pcd3 = o3d.geometry.PointCloud()
     pcd3.points = o3d.utility.Vector3dVector(newPoints)
 
-     #plot
+    #plot
     mesh1.compute_vertex_normals()
     mesh2.compute_vertex_normals()
 
@@ -69,12 +69,9 @@ def main():
     lines = o3d.geometry.LineSet().create_from_point_cloud_correspondences(pcd_keypoints_mesh1, pcd_keypoints_mesh2, correspondences_indices)
     rf = o3d.geometry.TriangleMesh.create_coordinate_frame(size=25)
 
-    o3d.visualization.draw_geometries([pcd3, mesh1, mesh2])
-    
+    o3d.visualization.draw_geometries([rf, mesh1, pcd_keypoints_mesh1, mesh2, pcd_keypoints_mesh2])
 
 
-
-    
 def loadScene():
 
     mesh1 = o3d.io.read_triangle_mesh('./data/mesh1.ply') 
@@ -87,9 +84,6 @@ def loadScene():
     saliency_mesh2 = np.load('./data/saliency_mesh2.npy')
 
     return [mesh1, mesh2, keypoints_mesh1, keypoints_mesh2, saliency_mesh1, saliency_mesh2]
-
-   
-
 
 def createScene():
 
@@ -127,13 +121,9 @@ def createScene():
 
 
     #compute ISS keypoints
-    pcd1 = o3d.geometry.PointCloud()
-    pcd1.points = mesh1.vertices
-    keypoints_pcd1, saliency_pcd1 = computeISS(pcd1)
-
-    pcd2 = o3d.geometry.PointCloud()
-    pcd2.points = mesh2.vertices
-    keypoints_pcd2, saliency_pcd2 = computeISS(pcd2)
+    
+    keypoints_pcd1, saliency_pcd1 = computeISS(mesh1)
+    keypoints_pcd2, saliency_pcd2 = computeISS(mesh2)
 
     #save keypoints
     np.save('./data/keypoints_mesh1', keypoints_pcd1)
@@ -141,8 +131,6 @@ def createScene():
 
     np.save('./data/keypoints_mesh2', keypoints_pcd2)
     np.save('./data/saliency_mesh2', saliency_pcd2)
-
-
 
 
 if __name__ == '__main__':
