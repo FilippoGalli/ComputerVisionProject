@@ -4,6 +4,7 @@ import math
 from ISSkeypoints import computeISS
 from sklearn.neighbors import KDTree
 from rototranslation import computeRototranslationParams
+from SPkeypoints import compute_SP
 
 def main():
 
@@ -11,6 +12,7 @@ def main():
 
     if create:
         createScene()
+        print('Scene has been created')
 
     mesh1, mesh2, keypoints_mesh1, keypoints_mesh2, saliency_mesh1, saliency_mesh2 = loadScene()
 
@@ -42,6 +44,8 @@ def main():
 
     R, T = computeRototranslationParams(correspondences_coords1, correspondences_coords2)
 
+
+    #
     newPoints = []
 
     for p in np.asarray(mesh1.vertices):
@@ -69,19 +73,19 @@ def main():
     lines = o3d.geometry.LineSet().create_from_point_cloud_correspondences(pcd_keypoints_mesh1, pcd_keypoints_mesh2, correspondences_indices)
     rf = o3d.geometry.TriangleMesh.create_coordinate_frame(size=25)
 
-    o3d.visualization.draw_geometries([rf, mesh1, pcd_keypoints_mesh1, mesh2, pcd_keypoints_mesh2])
+    o3d.visualization.draw_geometries([rf, mesh1, pcd_keypoints_mesh1, pcd3])
 
 
 def loadScene():
 
-    mesh1 = o3d.io.read_triangle_mesh('./data/mesh1.ply') 
-    mesh2 = o3d.io.read_triangle_mesh('./data/mesh2.ply') 
+    mesh1 = o3d.io.read_triangle_mesh('./data/output/app1/mesh1.ply') 
+    mesh2 = o3d.io.read_triangle_mesh('./data/output/app1/mesh2.ply') 
 
-    keypoints_mesh1 = np.load('./data/keypoints_mesh1.npy')
-    keypoints_mesh2 = np.load('./data/keypoints_mesh2.npy')
+    keypoints_mesh1 = np.load('./data/output/app1/keypoints_mesh1.npy')
+    keypoints_mesh2 = np.load('./data/output/app1/keypoints_mesh2.npy')
 
-    saliency_mesh1 = np.load('./data/saliency_mesh1.npy')
-    saliency_mesh2 = np.load('./data/saliency_mesh2.npy')
+    saliency_mesh1 = np.load('./data/output/app1/saliency_mesh1.npy')
+    saliency_mesh2 = np.load('./data/output/app1/saliency_mesh2.npy')
 
     return [mesh1, mesh2, keypoints_mesh1, keypoints_mesh2, saliency_mesh1, saliency_mesh2]
 
@@ -90,6 +94,7 @@ def createScene():
 
     #input paths
     input_file = "./data/Armadillo.ply"
+    sigma = [0.4, 0.7]
 
     #load mesh
     mesh1 = o3d.io.read_triangle_mesh(input_file)
@@ -116,21 +121,27 @@ def createScene():
     mesh2.rotate(rotationYaxis_mesh2)
     
     #save transformed mesh
-    o3d.io.write_triangle_mesh('./data/mesh1.ply', mesh1)
-    o3d.io.write_triangle_mesh('./data/mesh2.ply', mesh2)
+    o3d.io.write_triangle_mesh('./data/output/app1/mesh1.ply', mesh1)
+    o3d.io.write_triangle_mesh('./data/output/app1/mesh2.ply', mesh2)
 
 
     #compute ISS keypoints
     
-    keypoints_pcd1, saliency_pcd1 = computeISS(mesh1)
-    keypoints_pcd2, saliency_pcd2 = computeISS(mesh2)
+    pcd1 = o3d.geometry.PointCloud()
+    pcd1.points = mesh1.vertices
+
+    pcd2 = o3d.geometry.PointCloud()
+    pcd2.points = mesh2.vertices
+
+    keypoints_pcd1, saliency_pcd1 = compute_SP(mesh1, sigma)
+    keypoints_pcd2, saliency_pcd2 = compute_SP(mesh2, sigma)
 
     #save keypoints
-    np.save('./data/keypoints_mesh1', keypoints_pcd1)
-    np.save('./data/saliency_mesh1', saliency_pcd1)
+    np.save('./data/output/app1/keypoints_mesh1', keypoints_pcd1)
+    np.save('./data/output/app1/saliency_mesh1', saliency_pcd1)
 
-    np.save('./data/keypoints_mesh2', keypoints_pcd2)
-    np.save('./data/saliency_mesh2', saliency_pcd2)
+    np.save('./data/output/app1/keypoints_mesh2', keypoints_pcd2)
+    np.save('./data/output/app1/saliency_mesh2', saliency_pcd2)
 
 
 if __name__ == '__main__':

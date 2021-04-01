@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 
-def computeISS(mesh, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_32=0.975 , min_neighbors=5):
+def computeISS(pcd, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_32=0.975 , min_neighbors=5):
 
     def ComputeModelResolution(points, kdtree):
 
@@ -24,8 +24,7 @@ def computeISS(mesh, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_
         
         return True
     
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = mesh.vertices
+    
     points = np.asarray(pcd.points)
     saliency = np.full(len(points), -1.0)
     keypoints_index = []
@@ -92,29 +91,32 @@ def computeISS(mesh, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_
 
 def main():
 
-    input_file = "./data/Armadillo.ply"
-    mesh = o3d.io.read_triangle_mesh(input_file)
-    
-    flag = False
+    input_file = "./data/Armadillo_scans/ArmadilloOnHeadMultiple_0.ply"
+    pcd = o3d.io.read_point_cloud(input_file)
+    #pcd = o3d.geometry.PointCloud()
+    #pcd.points = mesh.vertices
+    print(len(pcd.points))
+    flag = True
 
     if flag:
 
-        keypoints, saliency = computeISS(mesh, 2.43, 1.62)
+        keypoints, saliency = computeISS(pcd)
         np.save('ISSkeypoints', keypoints)
         np.save('ISSsaliency', saliency)
     else:
-        path_keypoints = './data/ISSkeypoints.npy'
-        path_saliency = './data/ISSsaliency.npy'
+        path_keypoints = './data/output/ISSkeypoints.npy'
+        path_saliency = './data/output/ISSsaliency.npy'
         keypoints = np.load(path_keypoints)
         saliency = np.load(path_saliency)
     
     pcd_keypoints = o3d.geometry.PointCloud()
     pcd_keypoints.points = o3d.utility.Vector3dVector(keypoints)
     
-    pcd_keypoints.paint_uniform_color([1.0, 0.75, 0.0])
-    mesh.compute_vertex_normals()
-    mesh.paint_uniform_color([0.5, 0.5, 0.5])
-    o3d.visualization.draw_geometries([pcd_keypoints, mesh])
+    pcd_keypoints.paint_uniform_color([1.0, 0.0, 0.0])
+    pcd.paint_uniform_color([0.0, 0.0, 1.0])
+    #mesh.compute_vertex_normals()
+    #mesh.paint_uniform_color([0.5, 0.5, 0.5])
+    o3d.visualization.draw_geometries([pcd_keypoints, pcd])
 
 if __name__ == '__main__':
     main()

@@ -12,6 +12,13 @@ def IsLocalMaxima(query_index, indices, saliency):
         
     return True
 
+def distance(x, y):
+
+    distance = math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
+
+    return distance
+
+
 def gaussian_filter(tree, sigma, points, index):
 
     indices = tree.query_radius([points[index]], r=2*sigma)
@@ -20,9 +27,9 @@ def gaussian_filter(tree, sigma, points, index):
     denominator = 0
  
     for i in indices[0]:
-        
-        exp_coeff = - (points[index] - points[i])**2 / (2 * sigma**2)
-        e = np.array(list(map(lambda x : math.exp(x), exp_coeff)))
+                        
+        exp_coeff = - distance(points[index], points[i]) / (2 * sigma**2)
+        e = math.exp(exp_coeff)
         numerator = numerator + points[i] * e
         denominator = denominator + e
        
@@ -31,8 +38,9 @@ def gaussian_filter(tree, sigma, points, index):
     return g
 
 def DoG(tree, sigma, points, index):
-    g1 = gaussian_filter(tree, sigma, points, index)
-    g2 = gaussian_filter(tree, 2*sigma, points, index)
+
+    g1 = gaussian_filter(tree, sigma[0], points, index)
+    g2 = gaussian_filter(tree, sigma[1], points, index)
 
     return g1 - g2
 
@@ -57,7 +65,8 @@ def compute_SP(mesh, sigma):
     for i in range(len(points)):
         DoG_value = DoG(kdtree, sigma, points, i)
         saliency[i] = np.linalg.norm(np.dot(DoG_value, normals[i]))
-        
+      
+
     max_saliency = np.amax(saliency)
     min_saliency = np.amin(saliency)
     mean = np.mean(saliency)
@@ -65,12 +74,12 @@ def compute_SP(mesh, sigma):
 
     for i in range(len(points)):
         saliency[i] = (saliency[i] - min_saliency) / (max_saliency - min_saliency)
-        if saliency[i] >= 0.7:
-            
-            kp_indices = kdtree.query_radius([points[i]], 5)
-            if len(kp_indices[0]) - 1  > min_neighbors and IsLocalMaxima(i, kp_indices[0], saliency):
-                keypoints_index.append(i)
-                saliency_keypoint.append(saliency[i])
+
+    for i in range(len(points)):
+        indices = kdtree.query_radius([points[i]], r=5*sigma[1])
+        if saliency[i] >= 0.7 and IsLocalMaxima(i, indices[0], saliency):
+            keypoints_index.append(i)
+            saliency_keypoint.append(saliency[i])
     
     toc = 1000 * (time.time() - tic)
     print("SP Computation took {:.0f} [s]".format(toc/1000))
@@ -80,9 +89,9 @@ def compute_SP(mesh, sigma):
 
 
 def main():
-    sigma = 0.5
+    sigma = [0.4, 0.7]
 
-    flag = False
+    flag = True
 
     # Read .ply file
     input_file = "./data/Armadillo.ply"
