@@ -10,7 +10,7 @@ def createOctahedron(c=[0.0, 0.0, 0.0], r= 1.0):
     return [vertices, indices, triangles]
 
 
-def sphericalGrid(c, r):
+def createSphericalGrid(c, r):
 
     vertices, indices, triangles = createOctahedron(c, r)
 
@@ -54,6 +54,7 @@ def sphericalGrid(c, r):
             triangleB = newVertices[j][1]
             if  len(list(set(triangleA).intersection(triangleB))) != 0:
                newIndices.append([newVertices[i][0], newVertices[j][0]])
+    print(len(vertices))
     
     return vertices, newIndices
         
@@ -63,7 +64,7 @@ def main():
     center = [5.0, 0.0, 0.0]
     radius = 3.0
     pcd = o3d.geometry.PointCloud()
-    vertices, indices = sphericalGrid(center, radius)
+    vertices, indices = createSphericalGrid(center, radius)
 
     sphere = o3d.geometry.PointCloud()
     sphere.points = o3d.utility.Vector3dVector(vertices)
