@@ -86,7 +86,7 @@ def computeISS(pcd, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_3
     print("ISS Computation took {:.0f} [s]".format(toc/1000))
     print(f'number of keypoints found: {len(points[keypoints_indices])}')
 
-    return [keypoints_indices, saliency,  salient_radius]
+    return [keypoints_indices, saliency,  salient_radius, non_max_radius]
                   
  
  
@@ -94,10 +94,20 @@ def computeISS(pcd, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_3
 def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
 
 
+    max_saliency = max(saliency)
+    min_saliency = min(saliency)
+
+    for i in range(len(saliency)):
+        saliency[i] = (saliency[i] - min_saliency) / (max_saliency - min_saliency)
+
+
+
     keypoints = points[kp_indices]
     keypoints_normals = normals[kp_indices]
     keypoints_saliency = saliency[kp_indices]
     
+    
+
     #local reference system
   
     x = []
@@ -117,8 +127,16 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
     
        
         z.append(keypoints_normals[i])
-        x.append(([0.0, 0.0, 0.0] -keypoints[i]) / np.linalg.norm([0.0, 0.0, 0.0] -keypoints[i]))
+
+        x_first_comp = 1.0 - keypoints[i][0]
+        x_second_comp = 1.0 - keypoints[i][1]
+        formula = ((-z[i][0] * x_first_comp) + (-z[i][1] * x_second_comp) + (z[i][2] * keypoints[i][2])) / z[i][2]
+        x_third_comp = formula - keypoints[i][2]
+        x_norm = np.linalg.norm([x_first_comp, x_second_comp, x_third_comp])
+        x.append([x_first_comp, x_second_comp, x_third_comp] / x_norm)
+        
         y.append(np.cross(z[i], x[i]))
+        
 
         indices, distances = kdtree.query_radius([keypoints[i]], r=radius, return_distance=True)
         indices = indices[0]
@@ -142,7 +160,7 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
           
             phi = math.acos(np.dot(v_normalized, z[i]))
 
-            
+        
             temp = v - (v_norm * math.cos(phi) * z[i])
 
             v_xy = temp / (np.linalg.norm(temp))
@@ -150,10 +168,10 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
             if np.dot(v_xy, y[i]) >= 0:
                 theta = math.acos(np.dot(v_xy, x[i]))
             else:
-                theta = (2 * 3.14) - math.acos(np.dot(v_xy, x[i]))
+                theta = (2 * math.pi) - math.acos(np.dot(v_xy, x[i]))
             
             m = int((v_norm * (M / radius)) + 0.5)
-            l = int((theta * L) / (2 * 3.14) + 0.5)
+            l = int((theta * L) / (2 * math.pi) + 0.5)
 
             m -= 1
             l -= 1
@@ -162,7 +180,7 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
                 m = 0
             if l == -1:
                 l = 0
-
+            
             grid_element_counter[m][l] += 1 
             average_normal[m][l] += normals[indices[j]]
             average_saliency[m][l] += saliency[indices[j]]
@@ -171,9 +189,9 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
         for s in range(M):
             for t in range(L):
                 if grid_element_counter[s][t] != 0:
+
                     average_normal[s][t] /= grid_element_counter[s][t]
                     average_saliency[s][t] /= grid_element_counter[s][t]
-
                     delta_normals = 1.0 - abs(np.dot(average_normal[s][t], keypoints_normals[i]))
                     delta_saliency = 1.0 - (average_saliency[s][t] / keypoints_saliency[i])
 
@@ -184,6 +202,62 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
         descriptor_list.append(descriptor)
 
     return descriptor_list       
+
+
+
+def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=50):
+
+    M = 3
+    L = 36
+  
+    c_score_list = np.ndarray((len(descriptor_list1), len(descriptor_list2)))
+    
+    for i in range(len(descriptor_list1)):
+
+        for j in range(len(descriptor_list2)):
+
+            descriptor1 = descriptor_list1[i]
+            descriptor2 = descriptor_list2[j]
+            c_score = np.zeros((L))
+            c_max = 0
+
+
+            for m in range(M):
+                for l in range(L):
+                    for l_hat in range(L):
+                        n_score = (1 - abs(descriptor1[0][m][l] - descriptor2[0][m][l_hat])) 
+                        s_score = (1 - abs(descriptor1[1][m][l] - descriptor2[1][m][l_hat])) 
+                        c_score[l_hat] = n_score * s_score
+                    index_max = np.argmax(c_score)
+
+                    c_max += c_score[index_max]
+            
+            c_score_list[i, j] = c_max
+           
+    
+    values_to_sort = []
+    indices_to_sort = []
+
+    for i in range(len(descriptor_list1)):
+        
+        index = np.argmax(c_score_list[i][:])
+        values_to_sort.append(c_score_list[i][index])
+        indices_to_sort.append([i, index])
+
+        
+    sorted_indices = np.argsort(values_to_sort)  
+    indices_to_sort = np.array(indices_to_sort)
+    
+    matching_indices = indices_to_sort[sorted_indices[-threshold:]]
+    
+
+    values_to_sort = np.array(values_to_sort)
+    print(matching_indices)
+    print(values_to_sort[sorted_indices[-threshold:]])
+
+    
+
+    return matching_indices
 
 
 
@@ -204,14 +278,14 @@ def main():
     normals = np.asarray(pcd.normals)
     
     
-    flag = False
+    flag = True
 
     if flag:
         
-        keypoints_indices, saliency, salient_radius = computeISS(pcd)
-        np.save('ISSkeypoints_indices', keypoints_indices)
-        np.save('ISSsaliency', saliency)
-        np.save('salient_radius', salient_radius)
+        keypoints_indices, saliency, salient_radius, non_max_radius = computeISS(pcd)
+        np.save('../ISSkeypoints_indices', keypoints_indices)
+        np.save('../ISSsaliency', saliency)
+        np.save('../salient_radius', salient_radius)
     else:
         path_keypoints = 'ISSkeypoints_indices.npy'
         path_saliency = 'ISSsaliency.npy'
@@ -219,9 +293,8 @@ def main():
         keypoints_indices = np.load(path_keypoints)
         saliency = np.load(path_saliency)
         salient_radius = np.load(path_salient_radius)
-
+    print(max(saliency))
     
-    descriptor = computeFeatureDescriptor(points, normals, saliency, keypoints_indices, salient_radius)
     
     pcd_keypoints = o3d.geometry.PointCloud()
     pcd_keypoints.points = o3d.utility.Vector3dVector(points[keypoints_indices])
