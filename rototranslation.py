@@ -32,12 +32,22 @@ def computeRototranslationParams(points1, points2):
         q2.append(points2[i] - mean2)
         
         H += np.atleast_2d(q1[i]).transpose() * q2[i]
-
+        
     u, s, vh = np.linalg.svd(H)
-
-    x = np.matmul(vh.transpose(), u.transpose())
+    vh = vh.transpose()
+    
+    x = np.matmul(vh, u.transpose())
     det = np.linalg.det(x)
 
+    if round(det) == -1:
+
+        if 0.0 in s:
+            vh[:,2] = -vh[:,2]
+            x = np.matmul(vh, u.transpose())
+        else:
+            return [None, None]
+
+    
     R = x
     T = np.atleast_2d(mean2).transpose() - np.matmul(R, np.atleast_2d(mean1).transpose())
     return [R, T]

@@ -13,7 +13,7 @@ def computeISS(pcd, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_3
         for point in points:
             distances, indices = kdtree.query([point], 2)
             resolution += distances[0][1]
-
+            
         resolution /= len(points)
 
         return resolution
@@ -93,7 +93,7 @@ def computeISS(pcd, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_3
  
 def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
 
-
+    #normalize saliency btw 0 and 1
     max_saliency = max(saliency)
     min_saliency = min(saliency)
 
@@ -125,7 +125,7 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
     for i in range(len(keypoints)):
     
     
-       
+        #define local reference system
         z.append(keypoints_normals[i])
 
         x_first_comp = 1.0 - keypoints[i][0]
@@ -137,10 +137,11 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
         
         y.append(np.cross(z[i], x[i]))
         
-
+        #search points close to the keypoint
         indices, distances = kdtree.query_radius([keypoints[i]], r=radius, return_distance=True)
         indices = indices[0]
        
+        #setup arrays
         descriptor = np.zeros((2, M, L))
         average_normal = np.zeros((M, L, 3))
         average_saliency = np.zeros((M, L, 1))
@@ -148,7 +149,7 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
         grid_element_counter = np.zeros((M, L, 1))
         
         
-        
+        #assign each point to a sector m, l
         for j in range(len(indices)):
             
             v = points[indices[j]] - keypoints[i]
@@ -185,7 +186,7 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
             average_normal[m][l] += normals[indices[j]]
             average_saliency[m][l] += saliency[indices[j]]
 
-            
+        #compute average normal and saliency of all sectors    
         for s in range(M):
             for t in range(L):
                 if grid_element_counter[s][t] != 0:

@@ -32,13 +32,16 @@ def distance(x, y):
 
 def gaussian_filter(tree, sigma, points, index):
 
+    if sigma == 0.0:
+        return points[index]
+
     indices = tree.query_radius([points[index]], r=2*sigma)
 
     numerator = 0
     denominator = 0
  
     for i in indices[0]:
-                        
+                    
         exp_coeff = - distance(points[index], points[i])**2 / (2 * sigma**2)
         e = math.exp(exp_coeff)
         numerator += points[i] * e
@@ -48,65 +51,81 @@ def gaussian_filter(tree, sigma, points, index):
 
     return g
 
-def compute_SP(pcd, sigma=None):
+
+def computeSP(pcd, sigma=None, returnGaussians=False):
 
     tic = time.time()
-
+    
     points = np.asarray(pcd.points)
     normals = np.asarray(pcd.normals)
-    threshold = 0.70
-    min_neighbors = 5
 
-    saliency = np.full(len(points), -1.0)
+    saliency = []
     keypoints_indices = []
-    
-   
-    kdtree = KDTree(points)
 
+    kdtree = KDTree(points)
+    
+    g1 = []
+    g2 = []
+    
     if sigma == None:
         resolution = ComputeModelResolution(points, kdtree)
-        sigma = [resolution, 2 * resolution]
-        print(resolution)
+        sigma = [0.0, resolution*5]
+
 
     for i in range(len(points)):
-        g1 = gaussian_filter(kdtree, sigma[0], points, i)
-        g2 = gaussian_filter(kdtree, sigma[1], points, i)
-        saliency[i] = np.linalg.norm(np.dot(g1 - g2, normals[i]))
-      
+        g1.append(gaussian_filter(kdtree, sigma[0], points, i))
+        g2.append(gaussian_filter(kdtree, sigma[1], points, i))
+        
+   
+    for i in range(len(points)):
+        saliency.append(np.linalg.norm(np.dot(normals[i], g1[i] - g2[i])))
+            
 
     max_saliency = np.amax(saliency)
     min_saliency = np.amin(saliency)
-    mean = np.mean(saliency)
-
-
+    
     for i in range(len(points)):
         saliency[i] = (saliency[i] - min_saliency) / (max_saliency - min_saliency)
 
     for i in range(len(points)):
-        indices = kdtree.query_radius([points[i]], r=5*sigma[1])
-        if saliency[i] >= threshold and IsLocalMaxima(i, indices[0], saliency):
+        indices = kdtree.query_radius([points[i]], r=sigma[1])
+        if saliency[i] >= 0.90 and IsLocalMaxima(i, indices[0], saliency):
             keypoints_indices.append(i)
+               
             
     
     toc = 1000 * (time.time() - tic)
     print("SP Computation took {:.0f} [s]".format(toc/1000))
-    print(f'number of keypoints found: {len(points[keypoints_indices])}')
+    print(f'number of keypoints found: {len(keypoints_indices)}')
+    
+    saliency = np.array(saliency)
+    if returnGaussians == True:
+        return [keypoints_indices, saliency, sigma, g1, g2]
 
-    return [keypoints_indices, saliency]
+    return [keypoints_indices, saliency, sigma]
 
 
 
 
+def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
 
-def computeFeatureDescriptor(points, normals, saliency, kp_indices, sigma):
+    #normalize saliency btw 0 and 1
+    max_saliency = max(saliency)
+    min_saliency = min(saliency)
+
+    for i in range(len(saliency)):
+        saliency[i] = (saliency[i] - min_saliency) / (max_saliency - min_saliency)
+
 
 
     keypoints = points[kp_indices]
     keypoints_normals = normals[kp_indices]
     keypoints_saliency = saliency[kp_indices]
     
+    
+
     #local reference system
-    origin = []
+  
     x = []
     y = []
     z = []
@@ -118,121 +137,201 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, sigma):
     descriptor_list = []
 
     
+    
     for i in range(len(keypoints)):
-        
-        origin.append(keypoints[i])
+    
+    
+        #define local reference system
         z.append(keypoints_normals[i])
-        x.append([1.0, 0.0, 0.0])
-        y.append(np.cross(keypoints_normals[i], [1.0, 0.0, 0.0]))
 
-        indices = kdtree.query_radius([keypoints[i]], r=sigma)
+        x_first_comp = 1.0 - keypoints[i][0]
+        x_second_comp = 1.0 - keypoints[i][1]
+        formula = ((-z[i][0] * x_first_comp) + (-z[i][1] * x_second_comp) + (z[i][2] * keypoints[i][2])) / z[i][2]
+        x_third_comp = formula - keypoints[i][2]
+        x_norm = np.linalg.norm([x_first_comp, x_second_comp, x_third_comp])
+        x.append([x_first_comp, x_second_comp, x_third_comp] / x_norm)
+        
+        y.append(np.cross(z[i], x[i]))
+        
+        #search points close to the keypoint
+        indices, distances = kdtree.query_radius([keypoints[i]], r=radius, return_distance=True)
         indices = indices[0]
        
+        #setup arrays
         descriptor = np.zeros((2, M, L))
         average_normal = np.zeros((M, L, 3))
         average_saliency = np.zeros((M, L, 1))
 
         grid_element_counter = np.zeros((M, L, 1))
         
-
+        
+        #assign each point to a sector m, l
         for j in range(len(indices)):
+            
             v = points[indices[j]] - keypoints[i]
-
             v_norm = np.linalg.norm(v)
+               
             if v_norm == 0.0:
                 continue
             v_normalized = v / v_norm
           
             phi = math.acos(np.dot(v_normalized, z[i]))
 
-            temp = v - v_norm * math.cos(phi) * z[i]
+        
+            temp = v - (v_norm * math.cos(phi) * z[i])
 
-            v_xy = (temp) / (np.linalg.norm(temp))
+            v_xy = temp / (np.linalg.norm(temp))
 
             if np.dot(v_xy, y[i]) >= 0:
                 theta = math.acos(np.dot(v_xy, x[i]))
             else:
-                theta = 2 * 3.14 - math.acos(np.dot(v_xy, x[i]))
+                theta = (2 * math.pi) - math.acos(np.dot(v_xy, x[i]))
             
-            p = keypoints[i] +  v_norm * v_xy
+            m = int((v_norm * (M / radius)) + 0.5)
+            l = int((theta * L) / (2 * math.pi) + 0.5)
 
-            m = int(v_norm * (M / sigma) + 0.5)
-            l = int((theta * L) / (2 * 3.14) + 0.5)
+            m -= 1
+            l -= 1
 
-
-            if m == M:
-                m = M - 1
-            if l == L:
-                l = L - 1
-           
+            if m == -1:
+                m = 0
+            if l == -1:
+                l = 0
+            
             grid_element_counter[m][l] += 1 
             average_normal[m][l] += normals[indices[j]]
             average_saliency[m][l] += saliency[indices[j]]
 
-            
-
-        for j in range(M):
+        #compute average normal and saliency of all sectors    
+        for s in range(M):
             for t in range(L):
-                if grid_element_counter[j][t] != 0:
-                    average_normal[j][t] /= grid_element_counter[j][t]
-                    average_saliency[j][t] /= grid_element_counter[j][t]
+                if grid_element_counter[s][t] != 0:
 
-                    delta_normals = 1.0 - abs(np.dot(average_normal[j][t], keypoints_normals[i]))
-                    delta_saliency = 1.0 - average_saliency[j][t] / keypoints_saliency[i]
+                    average_normal[s][t] /= grid_element_counter[s][t]
+                    average_saliency[s][t] /= grid_element_counter[s][t]
+                    delta_normals = 1.0 - abs(np.dot(average_normal[s][t], keypoints_normals[i]))
+                    delta_saliency = 1.0 - (average_saliency[s][t] / keypoints_saliency[i])
 
-                    descriptor[0][j][t] = delta_normals
-                    descriptor[1][j][t] = delta_saliency[0]
+                    descriptor[0][s][t] = delta_normals
+                    descriptor[1][s][t] = delta_saliency[0]
 
-        
+      
         descriptor_list.append(descriptor)
 
-    return descriptor_list
+    return descriptor_list       
+
+
+def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=10):
+
+    M = 3
+    L = 36
+  
+    c_score_list = np.ndarray((len(descriptor_list1), len(descriptor_list2)))
+    list_to_order = []
+    matching_indices = []
+    
+    for i in range(len(descriptor_list1)):
+
+        for j in range(len(descriptor_list2)):
+
+            descriptor1 = descriptor_list1[i]
+            descriptor2 = descriptor_list2[j]
+            c_score = np.zeros((L))
+
+            for l_hat in range(L):
+                
+                for m in range(M):
+                    for l in range(L):
+                        
+                        offset = (l + l_hat) % L
+                    
+                        n_score = (1 - abs(descriptor1[0][m][l] - descriptor2[0][m][offset])) 
+                        s_score = (1 - abs(descriptor1[1][m][l] - descriptor2[1][m][offset])) 
+                        c_score[l_hat] += n_score * s_score
+                
+           
+            index_max = np.argmax(c_score)
+            c_score_list[i, j] = c_score[index_max]
+            list_to_order.append(c_score[index_max])
+    
+    list_to_order = np.sort(list_to_order)[::-1]
+    
+
+    for t in range(threshold):
+        for i in range(len(descriptor_list1)):
+            for j in range(len(descriptor_list2)):
+                if list_to_order[t] == c_score_list[i, j]:
+                    print(f'[{c_score_list[i, j]}] -> {i, j}')
+                    matching_indices.append([i, j])
+
+    
+    return matching_indices
 
 
 
-        
+
+
 def main():
 
-    sigma = [0.4, 0.8]
+    sigma = [0.0, 2.5]
     flag = True
 
     # Read .ply file
-    input_file = "./data/bunny/reconstruction/bun_zipper.ply"
-    #mesh = o3d.io.read_triangle_mesh(input_file)
-    #mesh.compute_vertex_normals()
-
+    input_file = './data/Armadillo.ply'
+   
     pcd = o3d.io.read_point_cloud(input_file)
     pcd.estimate_normals()
     pcd.orient_normals_consistent_tangent_plane(k=5)
 
-    #pcd = o3d.geometry.PointCloud()
-    #pcd.points = o3d.utility.Vector3dVector(mesh.vertices)
-    #pcd.normals = o3d.utility.Vector3dVector(mesh.vertex_normals)
+    noisy_points = []
+    for p in np.asarray(pcd.points):
+        noisy_points.append(np.random.normal(0.0, 0.1, 3) + p)
 
+    pcd.points = o3d.utility.Vector3dVector(noisy_points)
+    
     points = np.asarray(pcd.points)
     normals = np.asarray(pcd.normals)
 
+    
     if flag:
-        keypoints_indices, saliency = compute_SP(pcd)
+        keypoints_indices, saliency, sigma, g1, g2 = computeSP(pcd, returnGaussians=True)
 
         np.save('./data/SPkeypoints_indices', keypoints_indices)
         np.save('./data/SPsaliency', saliency)
-    else:
-        path_keypoints = './data/SPkeypoints_indices.npy'
-        path_saliency = './data/SPsaliency.npy'
-        keypoints_indices = np.load(path_keypoints)
-        saliency = np.load(path_saliency)
+        np.save('./data/SPsigma', sigma)
 
-    
-    #descriptor_list = computeFeatureDescriptor(points, normals, saliency, keypoints_indices, sigma[1])
+        pcd_g1 = o3d.geometry.PointCloud()
+        pcd_g1.points = o3d.utility.Vector3dVector(g1) 
+
+        pcd_g2 = o3d.geometry.PointCloud()
+        pcd_g2.points = o3d.utility.Vector3dVector(g2) 
+
+        o3d.io.write_point_cloud('./data/pcd_g1.ply', pcd_g1)
+        o3d.io.write_point_cloud('./data/pcd_g2.ply', pcd_g2)
+
+    path_keypoints = './data/SPkeypoints_indices.npy'
+    path_saliency = './data/SPsaliency.npy'
+    path_pcd_g1 = './data/pcd_g1.ply'
+    path_pcd_g2 = './data/pcd_g2.ply'
+    path_sigma = './data/SPsigma.npy'
+
+    keypoints_indices = np.load(path_keypoints)
+    saliency = np.load(path_saliency)
+    sigma = np.load(path_sigma)
+   
+    #plot stuff
+
+    pcd_g1 = o3d.io.read_point_cloud('./data/pcd_g1.ply')
+    pcd_g2 = o3d.io.read_point_cloud('./data/pcd_g2.ply')
 
     pcd_keypoints = o3d.geometry.PointCloud()
     pcd_keypoints.points = o3d.utility.Vector3dVector(points[keypoints_indices])
 
-    #mesh.compute_vertex_normals()
-    #mesh.paint_uniform_color([0.5, 0.5, 0.5])
     pcd.paint_uniform_color([0.5, 0.5, 0.5])
+    pcd_g1.paint_uniform_color([1.0, 0.0, 0.0])
+    pcd_g2.paint_uniform_color([0.0, 0.0, 1])
     pcd_keypoints.paint_uniform_color([1.0, 0.75, 0.0])
+    
     
     o3d.visualization.draw_geometries([pcd_keypoints, pcd])
 
