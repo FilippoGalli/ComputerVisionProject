@@ -55,7 +55,7 @@ def gaussian_filter(tree, sigma, points, index):
 def computeSP(pcd, sigma=None, returnGaussians=False):
 
     tic = time.time()
-    
+    print('Computing SP...')
     points = np.asarray(pcd.points)
     normals = np.asarray(pcd.normals)
 
@@ -89,7 +89,7 @@ def computeSP(pcd, sigma=None, returnGaussians=False):
 
     for i in range(len(points)):
         indices = kdtree.query_radius([points[i]], r=sigma[1])
-        if saliency[i] >= 0.90 and IsLocalMaxima(i, indices[0], saliency):
+        if saliency[i] >= 0.80 and IsLocalMaxima(i, indices[0], saliency):
             keypoints_indices.append(i)
                
             
@@ -261,33 +261,33 @@ def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=10):
         for i in range(len(descriptor_list1)):
             for j in range(len(descriptor_list2)):
                 if list_to_order[t] == c_score_list[i, j]:
-                    print(f'[{c_score_list[i, j]}] -> {i, j}')
+                    #print(f'[{c_score_list[i, j]}] -> {i, j}')
                     matching_indices.append([i, j])
 
     
     return matching_indices
 
 
-
-
-
 def main():
 
-    sigma = [0.0, 2.5]
-    flag = True
-
-    # Read .ply file
     input_file = './data/Armadillo.ply'
-   
+    path_keypoints_indices = './data/output/SP/SPkeypoints_indices.npy'
+    path_saliency = './data/output/SP/SPsaliency.npy'
+    path_pcd_g1 = './data/output/SP/pcd_g1.ply'
+    path_pcd_g2 = './data/output/SP/pcd_g2.ply'
+    path_sigma = './data/output/SP/SPsigma.npy'
+
+    flag = False
+
     pcd = o3d.io.read_point_cloud(input_file)
     pcd.estimate_normals()
     pcd.orient_normals_consistent_tangent_plane(k=5)
 
-    noisy_points = []
-    for p in np.asarray(pcd.points):
-        noisy_points.append(np.random.normal(0.0, 0.1, 3) + p)
+    # noisy_points = []
+    # for p in np.asarray(pcd.points):
+    #     noisy_points.append(np.random.normal(0.0, 0.1, 3) + p)
 
-    pcd.points = o3d.utility.Vector3dVector(noisy_points)
+    # pcd.points = o3d.utility.Vector3dVector(noisy_points)
     
     points = np.asarray(pcd.points)
     normals = np.asarray(pcd.normals)
@@ -296,9 +296,9 @@ def main():
     if flag:
         keypoints_indices, saliency, sigma, g1, g2 = computeSP(pcd, returnGaussians=True)
 
-        np.save('./data/SPkeypoints_indices', keypoints_indices)
-        np.save('./data/SPsaliency', saliency)
-        np.save('./data/SPsigma', sigma)
+        np.save(path_keypoints_indices, keypoints_indices)
+        np.save(path_saliency, saliency)
+        np.save(path_sigma, sigma)
 
         pcd_g1 = o3d.geometry.PointCloud()
         pcd_g1.points = o3d.utility.Vector3dVector(g1) 
@@ -306,34 +306,30 @@ def main():
         pcd_g2 = o3d.geometry.PointCloud()
         pcd_g2.points = o3d.utility.Vector3dVector(g2) 
 
-        o3d.io.write_point_cloud('./data/pcd_g1.ply', pcd_g1)
-        o3d.io.write_point_cloud('./data/pcd_g2.ply', pcd_g2)
+        o3d.io.write_point_cloud(path_pcd_g1, pcd_g1)
+        o3d.io.write_point_cloud(path_pcd_g2, pcd_g2)
 
-    path_keypoints = './data/SPkeypoints_indices.npy'
-    path_saliency = './data/SPsaliency.npy'
-    path_pcd_g1 = './data/pcd_g1.ply'
-    path_pcd_g2 = './data/pcd_g2.ply'
-    path_sigma = './data/SPsigma.npy'
+   
 
-    keypoints_indices = np.load(path_keypoints)
+    keypoints_indices = np.load(path_keypoints_indices)
     saliency = np.load(path_saliency)
     sigma = np.load(path_sigma)
-   
-    #plot stuff
+    
+    #plot 
 
-    pcd_g1 = o3d.io.read_point_cloud('./data/pcd_g1.ply')
-    pcd_g2 = o3d.io.read_point_cloud('./data/pcd_g2.ply')
+    pcd_g1 = o3d.io.read_point_cloud(path_pcd_g1)
+    pcd_g2 = o3d.io.read_point_cloud(path_pcd_g2)
 
     pcd_keypoints = o3d.geometry.PointCloud()
     pcd_keypoints.points = o3d.utility.Vector3dVector(points[keypoints_indices])
 
     pcd.paint_uniform_color([0.5, 0.5, 0.5])
     pcd_g1.paint_uniform_color([1.0, 0.0, 0.0])
-    pcd_g2.paint_uniform_color([0.0, 0.0, 1])
+    pcd_g2.paint_uniform_color([0.0, 0.0, 1.0])
     pcd_keypoints.paint_uniform_color([1.0, 0.75, 0.0])
     
     
-    o3d.visualization.draw_geometries([pcd_keypoints, pcd])
+    o3d.visualization.draw_geometries([pcd_keypoints, pcd, pcd_g2])
 
 
 if __name__ == '__main__':

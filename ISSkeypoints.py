@@ -40,6 +40,7 @@ def computeISS(pcd, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_3
         print(f'salient_radius= {salient_radius} non_max_radius= {non_max_radius}')
     
     tic = time.time()
+    print('Computing ISS...')
     for i in range(len(points)):
 
         indices = kdtree.query_radius([points[i]], salient_radius)
@@ -86,7 +87,7 @@ def computeISS(pcd, salient_radius=0, non_max_radius=0, gamma_21=0.975 , gamma_3
     print("ISS Computation took {:.0f} [s]".format(toc/1000))
     print(f'number of keypoints found: {len(points[keypoints_indices])}')
 
-    return [keypoints_indices, saliency,  salient_radius, non_max_radius]
+    return [keypoints_indices, saliency,  salient_radius]
                   
  
  
@@ -206,12 +207,14 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
 
 
 
-def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=50):
+def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=10):
 
     M = 3
     L = 36
   
     c_score_list = np.ndarray((len(descriptor_list1), len(descriptor_list2)))
+    list_to_order = []
+    matching_indices = []
     
     for i in range(len(descriptor_list1)):
 
@@ -220,58 +223,48 @@ def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=50):
             descriptor1 = descriptor_list1[i]
             descriptor2 = descriptor_list2[j]
             c_score = np.zeros((L))
-            c_max = 0
 
-
-            for m in range(M):
-                for l in range(L):
-                    for l_hat in range(L):
-                        n_score = (1 - abs(descriptor1[0][m][l] - descriptor2[0][m][l_hat])) 
-                        s_score = (1 - abs(descriptor1[1][m][l] - descriptor2[1][m][l_hat])) 
-                        c_score[l_hat] = n_score * s_score
-                    index_max = np.argmax(c_score)
-
-                    c_max += c_score[index_max]
-            
-            c_score_list[i, j] = c_max
+            for l_hat in range(L):
+                
+                for m in range(M):
+                    for l in range(L):
+                        
+                        offset = (l + l_hat) % L
+                    
+                        n_score = (1 - abs(descriptor1[0][m][l] - descriptor2[0][m][offset])) 
+                        s_score = (1 - abs(descriptor1[1][m][l] - descriptor2[1][m][offset])) 
+                        c_score[l_hat] += n_score * s_score
+                
            
+            index_max = np.argmax(c_score)
+            c_score_list[i, j] = c_score[index_max]
+            list_to_order.append(c_score[index_max])
     
-    values_to_sort = []
-    indices_to_sort = []
-
-    for i in range(len(descriptor_list1)):
-        
-        index = np.argmax(c_score_list[i][:])
-        values_to_sort.append(c_score_list[i][index])
-        indices_to_sort.append([i, index])
-
-        
-    sorted_indices = np.argsort(values_to_sort)  
-    indices_to_sort = np.array(indices_to_sort)
-    
-    matching_indices = indices_to_sort[sorted_indices[-threshold:]]
+    list_to_order = np.sort(list_to_order)[::-1]
     
 
-    values_to_sort = np.array(values_to_sort)
-    print(matching_indices)
-    print(values_to_sort[sorted_indices[-threshold:]])
+    for t in range(threshold):
+        for i in range(len(descriptor_list1)):
+            for j in range(len(descriptor_list2)):
+                if list_to_order[t] == c_score_list[i, j]:
+                    #print(f'[{c_score_list[i, j]}] -> {i, j}')
+                    matching_indices.append([i, j])
 
     
-
     return matching_indices
-
-
 
 
 
 def main():
 
-    input_file = "./data/Armadillo.ply"
-    pcd = o3d.io.read_point_cloud(input_file)
 
-    mesh = o3d.io.read_triangle_mesh(input_file)
-    mesh.compute_vertex_normals()
-    
+    input_file = "./data/Armadillo.ply"
+    path_keypoints_indices = './data/output/ISS/ISSkeypoints_indices.npy'
+    path_saliency = './data/output/ISS/ISSsaliency.npy'
+    path_salient_radius = './data/output/ISS/salient_radius.npy'
+
+
+    pcd = o3d.io.read_point_cloud(input_file)
     pcd.estimate_normals()
     pcd.orient_normals_consistent_tangent_plane(5)
 
@@ -279,22 +272,19 @@ def main():
     normals = np.asarray(pcd.normals)
     
     
-    flag = True
+    flag = False
 
     if flag:
         
-        keypoints_indices, saliency, salient_radius, non_max_radius = computeISS(pcd)
-        np.save('../ISSkeypoints_indices', keypoints_indices)
-        np.save('../ISSsaliency', saliency)
-        np.save('../salient_radius', salient_radius)
-    else:
-        path_keypoints = 'ISSkeypoints_indices.npy'
-        path_saliency = 'ISSsaliency.npy'
-        path_salient_radius = 'salient_radius.npy'
-        keypoints_indices = np.load(path_keypoints)
-        saliency = np.load(path_saliency)
-        salient_radius = np.load(path_salient_radius)
-    print(max(saliency))
+        keypoints_indices, saliency, salient_radius = computeISS(pcd)
+        np.save(path_keypoints_indices, keypoints_indices)
+        np.save(path_saliency, saliency)
+        np.save(path_salient_radius, salient_radius)
+   
+        
+    keypoints_indices = np.load(path_keypoints_indices)
+    saliency = np.load(path_saliency)
+    salient_radius = np.load(path_salient_radius)
     
     
     pcd_keypoints = o3d.geometry.PointCloud()
@@ -304,7 +294,7 @@ def main():
     pcd.paint_uniform_color([0.5, 0.5, 0.5])
     
 
-    o3d.visualization.draw_geometries([pcd_keypoints, mesh])
+    o3d.visualization.draw_geometries([pcd_keypoints, pcd])
 
 if __name__ == '__main__':
     main()
