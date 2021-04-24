@@ -81,6 +81,7 @@ def main():
     print('descriptors computed')
     print(f'Found {len(matching_indices)} matching indices')
     print(f'Ransac has found a model with an error of {error}')
+    print(f'R = {R}  \n T = {T}')
 
     pcd1_points = np.asarray(pcd1.points)
     pcd2_points = np.asarray(pcd2.points)
