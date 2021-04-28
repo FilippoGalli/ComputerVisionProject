@@ -61,7 +61,7 @@ def main():
 
         # create a new pcd 
         p_estimate = []
-        for p in pcd2_points:
+        for p in pcd1_points:
             p_estimate.append((np.matmul(R, np.atleast_2d(p).transpose()) + T).transpose()[0])  
 
         pcd_roto = o3d.geometry.PointCloud()
@@ -105,7 +105,7 @@ def main():
     rf = o3d.geometry.TriangleMesh.create_coordinate_frame(size=25)
 
     o3d.visualization.draw_geometries([rf, pcd1_keypoints, pcd2_keypoints, pcd1, pcd2, lines])
-    o3d.visualization.draw_geometries([rf, pcd1, pcd_roto])
+    o3d.visualization.draw_geometries([rf, pcd2, pcd_roto])
 
 
 
@@ -139,7 +139,7 @@ def loadScene():
 def createScene():
 
     #input paths
-    input_file1 = './data/half_armadillo.ply'
+    input_file1 = './data/Armadillo.ply'
     input_file2 = './data/Armadillo.ply'
     
     #load pointclouds
@@ -151,27 +151,31 @@ def createScene():
 
 
     #variables
-    alpha_pcd1 = np.radians(0)
-    beta_pcd1 = np.radians(90)
-    translation_pcd1 = np.array([100, 50, -50])
-    rotationXaxis_pcd1 = np.array([[1, 0, 0], [0, math.cos(alpha_pcd1), -math.sin(alpha_pcd1)], [0, math.sin(alpha_pcd1), math.cos(alpha_pcd1)]])
-    rotationYaxis_pcd1 = np.array([[math.cos(beta_pcd1), 0, math.sin(beta_pcd1)], [0, 1, 0], [-math.sin(beta_pcd1), 0,  math.cos(beta_pcd1)]])
+    # alpha_pcd1 = np.radians(0)
+    # beta_pcd1 = np.radians(90)
+    # translation_pcd1 = np.array([100, 50, -50])
+    # rotationXaxis_pcd1 = np.array([[1, 0, 0], [0, math.cos(alpha_pcd1), -math.sin(alpha_pcd1)], [0, math.sin(alpha_pcd1), math.cos(alpha_pcd1)]])
+    # rotationYaxis_pcd1 = np.array([[math.cos(beta_pcd1), 0, math.sin(beta_pcd1)], [0, 1, 0], [-math.sin(beta_pcd1), 0,  math.cos(beta_pcd1)]])
 
     gamma_pcd2 = np.radians(0)
-    beta_pcd2 = np.radians(-90)
-    translation_pcd2 = np.array([-100, 50, -50])
+    beta_pcd2 = np.radians(90)
+    translation_pcd2 = np.array([[100], [50], [-50]])
     rotationZaxis_pcd2 = np.array([[math.cos(gamma_pcd2), -math.sin(gamma_pcd2), 0], [math.sin(gamma_pcd2), math.cos(gamma_pcd2), 0], [0, 0, 1]])
     rotationYaxis_pcd2 = np.array([[math.cos(beta_pcd2), 0, math.sin(beta_pcd2)], [0, 1, 0], [-math.sin(beta_pcd2), 0,  math.cos(beta_pcd2)]])
 
 
     #pcd transformations
-    pcd1.rotate(rotationYaxis_pcd1)
-    pcd1.translate(translation_pcd1)
     pcd1.estimate_normals()
     pcd1.orient_normals_consistent_tangent_plane(k=5)
 
-    pcd2.rotate(rotationYaxis_pcd2)
-    pcd2.translate(translation_pcd2)
+    pcd2_points = np.asarray(pcd2.points)
+    p_estimate2 = []
+
+    for p in pcd2_points:
+        p_estimate2.append((np.matmul(rotationYaxis_pcd2, np.atleast_2d(p).transpose()) + translation_pcd2).transpose()[0])  
+
+    pcd2.points = o3d.utility.Vector3dVector(p_estimate2)
+    
     pcd2.estimate_normals()
     pcd2.orient_normals_consistent_tangent_plane(k=5)
     

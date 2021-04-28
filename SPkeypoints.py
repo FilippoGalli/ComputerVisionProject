@@ -5,7 +5,12 @@ import math
 import time
 
 
-def ComputeModelResolution(points, kdtree):
+
+
+
+def computeSP(pcd, sigma=None, returnGaussians=False):
+
+    def ComputeModelResolution(points, kdtree):
 
         resolution = 0.0
         for point in points:
@@ -16,43 +21,40 @@ def ComputeModelResolution(points, kdtree):
 
         return resolution
 
-def IsLocalMaxima(query_index, indices, saliency):
-    for i in indices:
-        if saliency[query_index] < saliency[i]:
-            return False
+    def IsLocalMaxima(query_index, indices, saliency):
+        for i in indices:
+            if saliency[query_index] < saliency[i]:
+                return False
         
-    return True
+        return True
 
-def distance(x, y):
+    def distance(x, y):
 
-    distance = math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
+        distance = math.sqrt((x[0] - y[0])**2 + (x[1] - y[1])**2 + (x[2] - y[2])**2)
 
-    return distance
+        return distance
 
 
-def gaussian_filter(tree, sigma, points, index):
+    def gaussian_filter(tree, sigma, points, index):
 
-    if sigma == 0.0:
-        return points[index]
+        if sigma == 0.0:
+            return points[index]
 
-    indices = tree.query_radius([points[index]], r=2*sigma)
+        indices = tree.query_radius([points[index]], r=2*sigma)
 
-    numerator = 0
-    denominator = 0
+        numerator = 0
+        denominator = 0
  
-    for i in indices[0]:
+        for i in indices[0]:
                     
-        exp_coeff = - distance(points[index], points[i])**2 / (2 * sigma**2)
-        e = math.exp(exp_coeff)
-        numerator += points[i] * e
-        denominator += e
+            exp_coeff = - distance(points[index], points[i])**2 / (2 * sigma**2)
+            e = math.exp(exp_coeff)
+            numerator += points[i] * e
+            denominator += e
        
-    g = numerator / denominator
+        g = numerator / denominator
 
-    return g
-
-
-def computeSP(pcd, sigma=None, returnGaussians=False):
+        return g
 
     tic = time.time()
     print('Computing SP...')
@@ -270,6 +272,8 @@ def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=10):
 
 def main():
 
+    flag = True
+
     input_file = './data/Armadillo.ply'
     path_keypoints_indices = './data/output/SP/SPkeypoints_indices.npy'
     path_saliency = './data/output/SP/SPsaliency.npy'
@@ -277,18 +281,11 @@ def main():
     path_pcd_g2 = './data/output/SP/pcd_g2.ply'
     path_sigma = './data/output/SP/SPsigma.npy'
 
-    flag = False
 
     pcd = o3d.io.read_point_cloud(input_file)
     pcd.estimate_normals()
     pcd.orient_normals_consistent_tangent_plane(k=5)
-
-    # noisy_points = []
-    # for p in np.asarray(pcd.points):
-    #     noisy_points.append(np.random.normal(0.0, 0.1, 3) + p)
-
-    # pcd.points = o3d.utility.Vector3dVector(noisy_points)
-    
+ 
     points = np.asarray(pcd.points)
     normals = np.asarray(pcd.normals)
 
@@ -310,7 +307,6 @@ def main():
         o3d.io.write_point_cloud(path_pcd_g2, pcd_g2)
 
    
-
     keypoints_indices = np.load(path_keypoints_indices)
     saliency = np.load(path_saliency)
     sigma = np.load(path_sigma)

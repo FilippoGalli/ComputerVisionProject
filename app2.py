@@ -39,17 +39,16 @@ def main():
         np.save('./data/output/app2/descriptor_list_pcd2', descriptor_list_pcd2)
 
         print('Computing matching score')
-        threshold = 200 # edit this parameter to increase the numbers of matchings
+        threshold = 1500 # edit this parameter to increase the numbers of matchings
         matching_indices = computeMatchingIndices(descriptor_list_pcd1, descriptor_list_pcd2, threshold)
         np.save('./data/output/app2/matching_indices', matching_indices)
 
         print('estimating roto-translation with RANSAC')
+
         # data structure:
         #   matching_points -> [index kp pcd1, index kp pcd2]
         #   kp pcd1 -> list of coords of kp pcd1
         #   kp pcd2 -> list of coords of kp pcd2
-
-        
 
         R, T, error = computeRANSAC(matching_indices, pcd1_points[keypoints_indices_pcd1], pcd2_points[keypoints_indices_pcd2])
 
@@ -59,7 +58,7 @@ def main():
 
         # create a new pcd 
         p_estimate = []
-        for p in pcd2_points:
+        for p in pcd1_points:
             p_estimate.append((np.matmul(R, np.atleast_2d(p).transpose()) + T).transpose()[0])  
 
         pcd_roto = o3d.geometry.PointCloud()
@@ -103,7 +102,7 @@ def main():
     rf = o3d.geometry.TriangleMesh.create_coordinate_frame(size=25)
 
     o3d.visualization.draw_geometries([rf, pcd1_keypoints, pcd2_keypoints, pcd1, pcd2, lines])
-    o3d.visualization.draw_geometries([rf, pcd1, pcd_roto])
+    o3d.visualization.draw_geometries([rf, pcd2, pcd_roto])
 
 
 
@@ -138,7 +137,7 @@ def createScene():
 
     #input paths
     input_file1 = './data/half_armadillo.ply'
-    input_file2 = './data/Armadillo.ply'
+    input_file2 = './data/half_armadillo.ply'
     
     #load pointclouds
     pcd1 = o3d.io.read_point_cloud(input_file1)
@@ -147,29 +146,42 @@ def createScene():
     pcd2 = o3d.io.read_point_cloud(input_file2)
     pcd2 = pcd2.uniform_down_sample(1)
 
+    noisy_points = []
+    for p in np.asarray(pcd2.points):
+        noisy_points.append(p + np.random.normal(0.0, 0.1, 3))
+
+    pcd2.points = o3d.utility.Vector3dVector(noisy_points)
+
 
     #variables
-    alpha_pcd1 = np.radians(0)
-    beta_pcd1 = np.radians(90)
-    translation_pcd1 = np.array([100, 50, -50])
-    rotationXaxis_pcd1 = np.array([[1, 0, 0], [0, math.cos(alpha_pcd1), -math.sin(alpha_pcd1)], [0, math.sin(alpha_pcd1), math.cos(alpha_pcd1)]])
-    rotationYaxis_pcd1 = np.array([[math.cos(beta_pcd1), 0, math.sin(beta_pcd1)], [0, 1, 0], [-math.sin(beta_pcd1), 0,  math.cos(beta_pcd1)]])
+    # alpha_pcd1 = np.radians(0)
+    # beta_pcd1 = np.radians(90)
+    # translation_pcd1 = np.array([100, 50, -50])
+    # rotationXaxis_pcd1 = np.array([[1, 0, 0], [0, math.cos(alpha_pcd1), -math.sin(alpha_pcd1)], [0, math.sin(alpha_pcd1), math.cos(alpha_pcd1)]])
+    # rotationYaxis_pcd1 = np.array([[math.cos(beta_pcd1), 0, math.sin(beta_pcd1)], [0, 1, 0], [-math.sin(beta_pcd1), 0,  math.cos(beta_pcd1)]])
 
     gamma_pcd2 = np.radians(0)
-    beta_pcd2 = np.radians(-90)
-    translation_pcd2 = np.array([-100, 50, -50])
+    beta_pcd2 = np.radians(90)
+    translation_pcd2 = np.array([[100], [50], [-50]])
     rotationZaxis_pcd2 = np.array([[math.cos(gamma_pcd2), -math.sin(gamma_pcd2), 0], [math.sin(gamma_pcd2), math.cos(gamma_pcd2), 0], [0, 0, 1]])
     rotationYaxis_pcd2 = np.array([[math.cos(beta_pcd2), 0, math.sin(beta_pcd2)], [0, 1, 0], [-math.sin(beta_pcd2), 0,  math.cos(beta_pcd2)]])
 
 
+    
     #pcd transformations
-    pcd1.rotate(rotationYaxis_pcd1)
-    pcd1.translate(translation_pcd1)
+    
     pcd1.estimate_normals()
     pcd1.orient_normals_consistent_tangent_plane(k=5)
 
-    pcd2.rotate(rotationYaxis_pcd2)
-    pcd2.translate(translation_pcd2)
+
+    pcd2_points = np.asarray(pcd2.points)
+    p_estimate2 = []
+
+    for p in pcd2_points:
+        p_estimate2.append((np.matmul(rotationYaxis_pcd2, np.atleast_2d(p).transpose()) + translation_pcd2).transpose()[0])  
+
+    pcd2.points = o3d.utility.Vector3dVector(p_estimate2)
+
     pcd2.estimate_normals()
     pcd2.orient_normals_consistent_tangent_plane(k=5)
     

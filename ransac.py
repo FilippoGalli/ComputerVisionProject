@@ -2,7 +2,7 @@ import random
 from rototranslation import computeRototranslationParams
 import numpy as np
 
-def computeRANSAC(matching_indices, points1, points2, k=1000, minimum_consensus = 5, threshold=1.0):
+def computeRANSAC(matching_indices, points1, points2, k=1000, minimum_consensus = 5, threshold=2.0):
 
     error_best = 99999 #generic big number
     model = [[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[0], [0], [0]]]
@@ -38,7 +38,7 @@ def computeRANSAC(matching_indices, points1, points2, k=1000, minimum_consensus 
             stima = np.matmul(R, np.atleast_2d(point_list1[l]).transpose()) + T
             residual = abs(stima.transpose()[0] - point_list2[l])
 
-            if all(residual <= 2.0):
+            if all(residual <= threshold):
               
                 count += 1
                 #print(f'punto1 {point_list1[l]} punto 2 {point_list2[l]}  stima {np.matmul(R, np.atleast_2d(point_list1[l]).transpose()) + T}')
@@ -50,7 +50,7 @@ def computeRANSAC(matching_indices, points1, points2, k=1000, minimum_consensus 
                 p_estimate = np.matmul(R, np.atleast_2d(points1[m[0]]).transpose()) + T
                 residual = abs(p_estimate.transpose()[0] - points2[m[1]])
 
-                if all(residual <= 2.0):
+                if all(residual <= threshold):
                 
                     consensus1.append(points1[m[0]])
                     consensus2.append(points2[m[1]])
