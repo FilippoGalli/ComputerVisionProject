@@ -14,7 +14,7 @@ def main():
 
     #create = True -> create a new configuration, it takes several hours! 
     #create = False -> load an existing configuration from the directory ./data/output/app3 
-    create = True
+    create = False
 
     if create:
 
@@ -39,7 +39,7 @@ def main():
         np.save('./data/output/app2/descriptor_list_pcd2', descriptor_list_pcd2)
 
         print('Computing matching score')
-        threshold = 1500 # edit this parameter to increase the numbers of matchings
+        threshold = 500 # edit this parameter to increase the numbers of matchings
         matching_indices = computeMatchingIndices(descriptor_list_pcd1, descriptor_list_pcd2, threshold)
         np.save('./data/output/app2/matching_indices', matching_indices)
 
@@ -50,7 +50,7 @@ def main():
         #   kp pcd1 -> list of coords of kp pcd1
         #   kp pcd2 -> list of coords of kp pcd2
 
-        R, T, error = computeRANSAC(matching_indices, pcd1_points[keypoints_indices_pcd1], pcd2_points[keypoints_indices_pcd2])
+        R, T, error = computeRANSAC(matching_indices, pcd1_points[keypoints_indices_pcd1], pcd2_points[keypoints_indices_pcd2], k=2000, threshold=4.0)
 
         np.save('./data/output/app2/R', R)
         np.save('./data/output/app2/T', T)
@@ -84,11 +84,12 @@ def main():
     pcd2_points = np.asarray(pcd2.points)
 
 
+
     #plot
     
     pcd1.paint_uniform_color([1, 0.0, 0.0])
     pcd2.paint_uniform_color([0.5, 0.5, 0.5])
-    pcd_roto.paint_uniform_color([0.5, 0.5, 0.5])
+    pcd_roto.paint_uniform_color([1.0, 0.0, 0.0])
 
     pcd1_keypoints = o3d.geometry.PointCloud()
     pcd1_keypoints.points = o3d.utility.Vector3dVector(pcd1_points[keypoints_indices_pcd1])
@@ -146,13 +147,7 @@ def createScene():
     pcd2 = o3d.io.read_point_cloud(input_file2)
     pcd2 = pcd2.uniform_down_sample(1)
 
-    noisy_points = []
-    for p in np.asarray(pcd2.points):
-        noisy_points.append(p + np.random.normal(0.0, 0.1, 3))
-
-    pcd2.points = o3d.utility.Vector3dVector(noisy_points)
-
-
+   
     #variables
     # alpha_pcd1 = np.radians(0)
     # beta_pcd1 = np.radians(90)

@@ -5,6 +5,7 @@ import numpy as np
 def computeRANSAC(matching_indices, points1, points2, k=1000, minimum_consensus = 5, threshold=2.0):
 
     error_best = 99999 #generic big number
+    consensus_best = 0
     model = [[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[0], [0], [0]]]
     
     
@@ -75,8 +76,9 @@ def computeRANSAC(matching_indices, points1, points2, k=1000, minimum_consensus 
                         error += np.linalg.norm(residual)
                     
                 
-                    if error <= error_best:
+                    if error <= error_best and n_consensus >= consensus_best:
                         
+                        consensus_best = n_consensus
                         error_best = error
                         model = [R, T]
                        

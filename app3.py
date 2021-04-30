@@ -1,12 +1,10 @@
-
-
-#pipeline using SP
+#pipeline using ISS
 
 
 import open3d as o3d
 import numpy as np
 from sklearn.neighbors import KDTree
-from SPkeypoints import computeSP, computeFeatureDescriptor,computeMatchingIndices
+from ISSkeypoints import computeISS, computeFeatureDescriptor,computeMatchingIndices
 import math
 from ransac import computeRANSAC
 
@@ -14,7 +12,7 @@ from ransac import computeRANSAC
 
 def main():
 
-    #create = True -> create a new configuration, it takes several minutes! 
+    #create = True -> create a new configuration, it takes several hours! 
     #create = False -> load an existing configuration from the directory ./data/output/app3 
     create = False
 
@@ -31,27 +29,26 @@ def main():
         print('Scene has been created')
         print('Computing keypoints')
 
-        keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, sigma_pcd1, sigma_pcd2 = computeKeypoints(pcd1, pcd2)
+        keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, salient_radius_pcd1, salient_radius_pcd2 = computeKeypoints(pcd1, pcd2)
 
         print('Creating features descriptor')
 
-        descriptor_list_pcd1 = computeFeatureDescriptor(pcd1_points, pcd1_normals, saliency_pcd1, keypoints_indices_pcd1, sigma_pcd1[1])
-        descriptor_list_pcd2 = computeFeatureDescriptor(pcd2_points, pcd2_normals, saliency_pcd2, keypoints_indices_pcd2, sigma_pcd2[1])
+        descriptor_list_pcd1 = computeFeatureDescriptor(pcd1_points, pcd1_normals, saliency_pcd1, keypoints_indices_pcd1, salient_radius_pcd1)
+        descriptor_list_pcd2 = computeFeatureDescriptor(pcd2_points, pcd2_normals, saliency_pcd2, keypoints_indices_pcd2, salient_radius_pcd2)
         np.save('./data/output/app3/descriptor_list_pcd1', descriptor_list_pcd1)
         np.save('./data/output/app3/descriptor_list_pcd2', descriptor_list_pcd2)
 
         print('Computing matching score')
-        threshold = 20 # edit this parameter to increase the numbers of matchings
+        threshold = 500 # edit this parameter to increase the numbers of matchings
         matching_indices = computeMatchingIndices(descriptor_list_pcd1, descriptor_list_pcd2, threshold)
         np.save('./data/output/app3/matching_indices', matching_indices)
 
         print('estimating roto-translation with RANSAC')
+
         # data structure:
         #   matching_points -> [index kp pcd1, index kp pcd2]
         #   kp pcd1 -> list of coords of kp pcd1
         #   kp pcd2 -> list of coords of kp pcd2
-
-        
 
         R, T, error = computeRANSAC(matching_indices, pcd1_points[keypoints_indices_pcd1], pcd2_points[keypoints_indices_pcd2])
 
@@ -74,10 +71,10 @@ def main():
 
 
 
-    pcd1, pcd2, keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, sigma_pcd1, sigma_pcd2, descriptor_list_pcd1, descriptor_list_pcd2, matching_indices, R, T, error, pcd_roto = loadScene()
+    pcd1, pcd2, keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, salient_radius_pcd1, salient_radius_pcd2, descriptor_list_pcd1, descriptor_list_pcd2, matching_indices, R, T, error, pcd_roto = loadScene()
     
-    print(f'pcd1 number of keypoints found using SP: {len(keypoints_indices_pcd1)}')
-    print(f'pcd2 number of keypoints found using SP: {len(keypoints_indices_pcd2)}')
+    print(f'pcd1 number of keypoints found using ISS: {len(keypoints_indices_pcd1)}')
+    print(f'pcd2 number of keypoints found using ISS: {len(keypoints_indices_pcd2)}')
     print('descriptors computed')
     print(f'Found {len(matching_indices)} matching indices')
     print(f'Ransac has found a model with an error of {error}')
@@ -89,9 +86,9 @@ def main():
 
     #plot
     
-    pcd1.paint_uniform_color([1, 0.0, 0.0])
-    pcd2.paint_uniform_color([0.5, 0.5, 0.5])
-    pcd_roto.paint_uniform_color([0.5, 0.5, 0.5])
+    pcd1.paint_uniform_color([1.0, 0.0, 0.0])
+    pcd2.paint_uniform_color([0.0, 1.0, 0.0])
+    pcd_roto.paint_uniform_color([1.0, 0.0, 0.0])
 
     pcd1_keypoints = o3d.geometry.PointCloud()
     pcd1_keypoints.points = o3d.utility.Vector3dVector(pcd1_points[keypoints_indices_pcd1])
@@ -116,11 +113,11 @@ def loadScene():
 
     keypoints_indices_pcd1 = np.load('./data/output/app3/keypoints_indices_pcd1.npy')
     saliency_pcd1 = np.load('./data/output/app3/saliency_pcd1.npy')
-    sigma_pcd1 = np.load('./data/output/app3/sigma_pcd1.npy')
+    salient_radius_pcd1 = np.load('./data/output/app3/salient_radius_pcd1.npy')
 
     keypoints_indices_pcd2 = np.load('./data/output/app3/keypoints_indices_pcd2.npy')
     saliency_pcd2 = np.load('./data/output/app3/saliency_pcd2.npy')
-    sigma_pcd2 = np.load('./data/output/app3/sigma_pcd2.npy')
+    salient_radius_pcd2 = np.load('./data/output/app3/salient_radius_pcd2.npy')
 
     descriptor_list_pcd1 = np.load('./data/output/app3/descriptor_list_pcd1.npy')
     descriptor_list_pcd2 = np.load('./data/output/app3/descriptor_list_pcd2.npy')
@@ -133,14 +130,14 @@ def loadScene():
 
     pcd_roto = o3d.io.read_point_cloud('./data/output/app3/pcd_roto.ply') 
     
-    return [pcd1, pcd2, keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, sigma_pcd1, sigma_pcd2, descriptor_list_pcd1, descriptor_list_pcd2, matching_indices, R, T, error, pcd_roto]
+    return [pcd1, pcd2, keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, salient_radius_pcd1, salient_radius_pcd2, descriptor_list_pcd1, descriptor_list_pcd2, matching_indices, R, T, error, pcd_roto]
    
     
 def createScene():
 
     #input paths
-    input_file1 = './data/Armadillo.ply'
-    input_file2 = './data/Armadillo.ply'
+    input_file1 = './data/half_armadillo.ply'
+    input_file2 = './data/more_than_half_armadillo.ply'
     
     #load pointclouds
     pcd1 = o3d.io.read_point_cloud(input_file1)
@@ -149,7 +146,7 @@ def createScene():
     pcd2 = o3d.io.read_point_cloud(input_file2)
     pcd2 = pcd2.uniform_down_sample(1)
 
-
+    
     #variables
     # alpha_pcd1 = np.radians(0)
     # beta_pcd1 = np.radians(90)
@@ -164,9 +161,12 @@ def createScene():
     rotationYaxis_pcd2 = np.array([[math.cos(beta_pcd2), 0, math.sin(beta_pcd2)], [0, 1, 0], [-math.sin(beta_pcd2), 0,  math.cos(beta_pcd2)]])
 
 
+    
     #pcd transformations
+    
     pcd1.estimate_normals()
     pcd1.orient_normals_consistent_tangent_plane(k=5)
+
 
     pcd2_points = np.asarray(pcd2.points)
     p_estimate2 = []
@@ -175,7 +175,7 @@ def createScene():
         p_estimate2.append((np.matmul(rotationYaxis_pcd2, np.atleast_2d(p).transpose()) + translation_pcd2).transpose()[0])  
 
     pcd2.points = o3d.utility.Vector3dVector(p_estimate2)
-    
+
     pcd2.estimate_normals()
     pcd2.orient_normals_consistent_tangent_plane(k=5)
     
@@ -190,22 +190,22 @@ def computeKeypoints(pcd1, pcd2):
     
     #compute ISS keypoints
     
-    keypoints_indices_pcd1, saliency_pcd1, sigma_pcd1 = computeSP(pcd1)
-    keypoints_indices_pcd2, saliency_pcd2, sigma_pcd2 = computeSP(pcd2)
+    keypoints_indices_pcd1, saliency_pcd1, salient_radius_pcd1 = computeISS(pcd1)
+    keypoints_indices_pcd2, saliency_pcd2, salient_radius_pcd2 = computeISS(pcd2)
 
 
     #save keypoints
     np.save('./data/output/app3/keypoints_indices_pcd1', keypoints_indices_pcd1)
     np.save('./data/output/app3/saliency_pcd1', saliency_pcd1)
-    np.save('./data/output/app3/sigma_pcd1', sigma_pcd1)
+    np.save('./data/output/app3/salient_radius_pcd1', salient_radius_pcd1)
     
 
     np.save('./data/output/app3/keypoints_indices_pcd2', keypoints_indices_pcd2)
     np.save('./data/output/app3/saliency_pcd2', saliency_pcd2)
-    np.save('./data/output/app3/sigma_pcd2', sigma_pcd2)
+    np.save('./data/output/app3/salient_radius_pcd2', salient_radius_pcd2)
     
 
-    return [keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, sigma_pcd1, sigma_pcd2]
+    return [keypoints_indices_pcd1, keypoints_indices_pcd2, saliency_pcd1, saliency_pcd2, salient_radius_pcd1, salient_radius_pcd2]
 
 
     
