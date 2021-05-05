@@ -82,6 +82,7 @@ def main():
     print(f'Found {len(matching_indices)} matching indices')
     print(f'Ransac has found a model with an error of {error}')
     print(f'R = {R}  \n T = {T}')
+    print(f'residuals R = {R - np.array([[math.cos(90), 0, math.sin(90)], [0, 1, 0], [-math.sin(90), 0,  math.cos(90)]])} T = {T - np.array([[100], [50], [-50]])}')
 
     pcd1_points = np.asarray(pcd1.points)
     pcd2_points = np.asarray(pcd2.points)

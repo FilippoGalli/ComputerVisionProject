@@ -272,7 +272,7 @@ def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=10):
 
 def main():
 
-    flag = True
+    flag = False
 
     input_file = './data/Armadillo.ply'
     path_keypoints_indices = './data/output/SP/SPkeypoints_indices.npy'

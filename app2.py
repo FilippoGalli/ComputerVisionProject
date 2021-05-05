@@ -100,7 +100,7 @@ def main():
     pcd2_keypoints.paint_uniform_color([1.0, 0.75, 0.0])
 
     lines = o3d.geometry.LineSet().create_from_point_cloud_correspondences(pcd1_keypoints, pcd2_keypoints, matching_indices)
-    rf = o3d.geometry.TriangleMesh.create_coordinate_frame(size=25)
+    rf = o3d.geometry.TriangleMesh.create_coordinate_frame(size=20)
 
     o3d.visualization.draw_geometries([rf, pcd1_keypoints, pcd2_keypoints, pcd1, pcd2, lines])
     o3d.visualization.draw_geometries([rf, pcd2, pcd_roto])

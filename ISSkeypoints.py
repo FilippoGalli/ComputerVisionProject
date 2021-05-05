@@ -207,7 +207,7 @@ def computeFeatureDescriptor(points, normals, saliency, kp_indices, radius):
 
 
 
-def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=10):
+def computeMatchingIndices(descriptor_list1, descriptor_list2, threshold=200):
 
     M = 3
     L = 36
